@@ -33,9 +33,38 @@ export interface CreateWaitlistEntryRequest {
 }
 
 /**
+ * Request body for adding a wallet to waitlist
+ */
+export interface AddWalletRequest {
+  walletAddress: string;
+}
+
+/**
  * Response structure for waitlist queries
  */
 export interface WaitlistResponse {
-  entries: WaitlistEntry[];
-  meta: WaitlistMeta;
+  entries: Array<{
+    walletAddress: string;
+    joinedAt: number;
+  }>;
+  total: number;
+}
+
+/**
+ * Response for bulk wallet addition
+ */
+export interface BulkAddResponse {
+  successful: Array<{
+    walletAddress: string;
+    joinedAt: number;
+  }>;
+  failed: Array<{
+    walletAddress: string;
+    reason: string;
+  }>;
+  summary: {
+    total: number;
+    succeeded: number;
+    failed: number;
+  };
 } 

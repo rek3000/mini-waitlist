@@ -67,4 +67,13 @@ export interface BulkAddResponse {
     succeeded: number;
     failed: number;
   };
+}
+
+// Add new interface for wallet check response
+export interface WalletCheckResponse {
+  exists: boolean;
+  details?: {
+    walletAddress: string;
+    joinedAt: number;
+  };
 } 

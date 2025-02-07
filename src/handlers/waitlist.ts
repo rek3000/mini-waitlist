@@ -4,10 +4,11 @@ import { AddWalletRequest, BulkAddResponse } from '../types';
 export async function addToWaitlist(c: Context) {
   try {
     const body = await c.req.json<AddWalletRequest>();
-    const { walletAddress } = body;
+    // Convert to lowercase before validation
+    const walletAddress = body.walletAddress?.toLowerCase();
 
     // Basic wallet address validation
-    if (!walletAddress?.match(/^0x[a-fA-F0-9]{40}$/)) {
+    if (!walletAddress?.match(/^0x[a-fa-f0-9]{40}$/)) {
       return c.json({ error: 'Invalid wallet address format' }, 400);
     }
 
@@ -68,10 +69,10 @@ export async function bulkAddToWaitlist(c: Context) {
     }
 
     const content = await file.text();
-    // Split by either newline or comma
+    // Split by either newline or comma and convert to lowercase
     const addresses = content
       .split(/[\n,]/)
-      .map(addr => addr.trim())
+      .map(addr => addr.trim().toLowerCase())
       .filter(addr => addr.length > 0); // Remove empty lines
 
     const kv = c.env.WAITLIST_KV;
@@ -89,8 +90,8 @@ export async function bulkAddToWaitlist(c: Context) {
     await Promise.all(
       addresses.map(async (walletAddress) => {
         try {
-          // Validate address format
-          if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+          // Validate address format (updated regex to accept lowercase only)
+          if (!walletAddress.match(/^0x[a-f0-9]{40}$/)) {
             response.failed.push({
               walletAddress,
               reason: 'Invalid wallet address format'
@@ -133,5 +134,38 @@ export async function bulkAddToWaitlist(c: Context) {
   } catch (error) {
     console.error('Error in bulk add:', error);
     return c.json({ error: 'Failed to process bulk addition' }, 500);
+  }
+}
+
+// Add new handler for checking wallet
+export async function checkWallet(c: Context) {
+  try {
+    // Convert to lowercase before validation
+    const walletAddress = c.req.param('walletAddress')?.toLowerCase();
+
+    // Basic wallet address validation
+    if (!walletAddress?.match(/^0x[a-f0-9]{40}$/)) {
+      return c.json({ error: 'Invalid wallet address format' }, 400);
+    }
+
+    const kv = c.env.WAITLIST_KV;
+    
+    // Check if wallet exists
+    const timestamp = await kv.get(walletAddress);
+    
+    if (!timestamp) {
+      return c.json({ exists: false });
+    }
+
+    return c.json({
+      exists: true,
+      details: {
+        walletAddress,
+        joinedAt: Number(timestamp)
+      }
+    });
+  } catch (error) {
+    console.error('Error checking wallet:', error);
+    return c.json({ error: 'Failed to check wallet' }, 500);
   }
 } 

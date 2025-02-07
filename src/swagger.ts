@@ -162,6 +162,75 @@ export const swaggerConfig: OpenAPIV3.Document = {
           }
         }
       }
+    },
+    '/waitlist/{walletAddress}': {
+      get: {
+        summary: 'Check wallet status',
+        description: 'Check if a specific wallet address is in the waitlist',
+        parameters: [
+          {
+            name: 'walletAddress',
+            in: 'path',
+            required: true,
+            description: 'Ethereum wallet address to check',
+            schema: {
+              type: 'string',
+              pattern: '^0x[a-fA-F0-9]{40}$',
+              example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+            }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Wallet check result',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    exists: {
+                      type: 'boolean',
+                      description: 'Whether the wallet is in the waitlist'
+                    },
+                    details: {
+                      type: 'object',
+                      properties: {
+                        walletAddress: {
+                          type: 'string',
+                          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+                        },
+                        joinedAt: {
+                          type: 'number',
+                          example: 1709529600000
+                        }
+                      }
+                    }
+                  }
+                },
+                examples: {
+                  'Found': {
+                    value: {
+                      exists: true,
+                      details: {
+                        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+                        joinedAt: 1709529600000
+                      }
+                    }
+                  },
+                  'Not Found': {
+                    value: {
+                      exists: false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Invalid wallet address format'
+          }
+        }
+      }
     }
   }
 }; 

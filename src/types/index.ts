@@ -35,9 +35,7 @@ export interface CreateWaitlistEntryRequest {
 /**
  * Request body for adding a wallet to waitlist
  */
-export interface AddWalletRequest {
-  walletAddress: string;
-}
+export type AddWalletRequest = CreateWaitlistEntryRequest;
 
 /**
  * Response structure for waitlist queries

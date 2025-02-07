@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import { AddWalletRequest, BulkAddResponse } from '../types';
+import { AddWalletRequest, BulkAddResponse } from '../types/index';
 
 export async function addToWaitlist(c: Context) {
   try {
@@ -8,7 +8,7 @@ export async function addToWaitlist(c: Context) {
     const walletAddress = body.walletAddress?.toLowerCase();
 
     // Basic wallet address validation
-    if (!walletAddress?.match(/^0x[a-fa-f0-9]{40}$/)) {
+    if (!walletAddress?.match(/^0x[a-f0-9]{40}$/)) {
       return c.json({ error: 'Invalid wallet address format' }, 400);
     }
 
@@ -29,7 +29,6 @@ export async function addToWaitlist(c: Context) {
       joinedAt: timestamp
     }, 201);
   } catch (error) {
-    console.error('Error adding to waitlist:', error);
     return c.json({ error: 'Failed to add to waitlist' }, 500);
   }
 }
@@ -54,7 +53,6 @@ export async function getWaitlist(c: Context) {
       total: entries.length
     });
   } catch (error) {
-    console.error('Error fetching waitlist:', error);
     return c.json({ error: 'Failed to fetch waitlist' }, 500);
   }
 }
@@ -69,11 +67,10 @@ export async function bulkAddToWaitlist(c: Context) {
     }
 
     const content = await file.text();
-    // Split by either newline or comma and convert to lowercase
     const addresses = content
       .split(/[\n,]/)
       .map(addr => addr.trim().toLowerCase())
-      .filter(addr => addr.length > 0); // Remove empty lines
+      .filter(addr => addr.length > 0);
 
     const kv = c.env.WAITLIST_KV;
     const response: BulkAddResponse = {
@@ -86,11 +83,9 @@ export async function bulkAddToWaitlist(c: Context) {
       }
     };
 
-    // Process each address
     await Promise.all(
       addresses.map(async (walletAddress) => {
         try {
-          // Validate address format (updated regex to accept lowercase only)
           if (!walletAddress.match(/^0x[a-f0-9]{40}$/)) {
             response.failed.push({
               walletAddress,
@@ -100,7 +95,6 @@ export async function bulkAddToWaitlist(c: Context) {
             return;
           }
 
-          // Check if already exists
           const existing = await kv.get(walletAddress);
           if (existing) {
             response.failed.push({
@@ -111,7 +105,6 @@ export async function bulkAddToWaitlist(c: Context) {
             return;
           }
 
-          // Add to waitlist
           const timestamp = Date.now();
           await kv.put(walletAddress, timestamp.toString());
           
@@ -132,25 +125,19 @@ export async function bulkAddToWaitlist(c: Context) {
 
     return c.json(response, 201);
   } catch (error) {
-    console.error('Error in bulk add:', error);
     return c.json({ error: 'Failed to process bulk addition' }, 500);
   }
 }
 
-// Add new handler for checking wallet
 export async function checkWallet(c: Context) {
   try {
-    // Convert to lowercase before validation
     const walletAddress = c.req.param('walletAddress')?.toLowerCase();
 
-    // Basic wallet address validation
     if (!walletAddress?.match(/^0x[a-f0-9]{40}$/)) {
       return c.json({ error: 'Invalid wallet address format' }, 400);
     }
 
     const kv = c.env.WAITLIST_KV;
-    
-    // Check if wallet exists
     const timestamp = await kv.get(walletAddress);
     
     if (!timestamp) {
@@ -165,7 +152,6 @@ export async function checkWallet(c: Context) {
       }
     });
   } catch (error) {
-    console.error('Error checking wallet:', error);
     return c.json({ error: 'Failed to check wallet' }, 500);
   }
 } 

@@ -7,15 +7,10 @@ export async function authMiddleware(c: Context, next: Next) {
   const apiKey = c.env.API_KEY;
   const providedKey = c.req.header('X-API-Key');
 
-  console.log('Expected API Key:', apiKey);
-  console.log('Provided API Key:', providedKey);
-  console.log('Headers:', c.req.header());
-
   if (!apiKey) {
     return c.json(
       {
-        error: 'Server configuration error - API key not set',
-        environment: c.env,
+        error: 'Server configuration error - API key not set'
       },
       500
     );
@@ -24,10 +19,7 @@ export async function authMiddleware(c: Context, next: Next) {
   if (!providedKey || providedKey !== apiKey) {
     return c.json(
       {
-        error: 'Unauthorized - Invalid or missing API key',
-        expected: apiKey,
-        provided: providedKey,
-        headers: c.req.header()
+        error: 'Unauthorized - Invalid or missing API key'
       },
       401
     );

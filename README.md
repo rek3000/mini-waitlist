@@ -1,25 +1,46 @@
-# Cloudflare Workers OpenAPI 3.1
+# Mini Waitlist API
 
-This is a Cloudflare Worker with OpenAPI 3.1 using [chanfana](https://github.com/cloudflare/chanfana) and [Hono](https://github.com/honojs/hono).
+A Cloudflare Workers API for managing a waitlist with wallet addresses.
 
-This is an example project made to be used as a quick start into building OpenAPI compliant Workers that generates the
-`openapi.json` schema automatically from code and validates the incoming request to the defined parameters or request body.
+## Setup
 
-## Get started
+1. Clone the repository
+```bash
+git clone <repository-url>
+cd mini-waitlist
+```
 
-1. Sign up for [Cloudflare Workers](https://workers.dev). The free tier is more than enough for most use cases.
-2. Clone this project and install dependencies with `npm install`
-3. Run `wrangler login` to login to your Cloudflare account in wrangler
-4. Run `wrangler deploy` to publish the API to Cloudflare Workers
+2. Install dependencies
+```bash
+npm install
+```
 
-## Project structure
+3. Create KV namespaces
+```bash
+npx wrangler kv:namespace create WAITLIST_KV
+npx wrangler kv:namespace create WAITLIST_KV --preview
+```
 
-1. Your main router is defined in `src/index.ts`.
-2. Each endpoint has its own file in `src/endpoints/`.
-3. For more information read the [chanfana documentation](https://chanfana.pages.dev/) and [Hono documentation](https://hono.dev/docs).
+4. Create .dev.vars file for local development
+```bash
+API_KEY=your_api_key_here
+```
 
-## Development
+5. Update wrangler.json with your KV namespace IDs
+- Copy .env.example to .env
+- Update the values with your KV namespace IDs and API key
 
-1. Run `wrangler dev` to start a local instance of the API.
-2. Open `http://localhost:8787/` in your browser to see the Swagger interface where you can try the endpoints.
-3. Changes made in the `src/` folder will automatically trigger the server to reload, you only need to refresh the Swagger interface.
+6. Deploy
+```bash
+wrangler deploy
+```
+
+## Environment Variables
+
+- `API_KEY`: API key for protected endpoints
+- `WAITLIST_KV_ID`: KV namespace ID for production
+- `WAITLIST_KV_PREVIEW_ID`: KV namespace ID for development
+
+## API Documentation
+
+API documentation is available at `/docs` endpoint when the service is running.

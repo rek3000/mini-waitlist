@@ -11,7 +11,28 @@ export const swaggerConfig: OpenAPIV3.Document = {
     '/waitlist': {
       get: {
         summary: 'Get all waitlist entries',
-        description: 'Retrieves all wallet addresses and their join timestamps',
+        description: 'Retrieves all wallet addresses and their allocations',
+        parameters: [
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            description: 'Number of entries to return (default: 1000)',
+            schema: {
+              type: 'integer',
+              example: 1000
+            }
+          },
+          {
+            name: 'cursor',
+            in: 'query',
+            required: false,
+            description: 'Cursor for pagination',
+            schema: {
+              type: 'string'
+            }
+          }
+        ],
         responses: {
           '200': {
             description: 'List of waitlist entries',
@@ -29,9 +50,9 @@ export const swaggerConfig: OpenAPIV3.Document = {
                             type: 'string',
                             example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
                           },
-                          joinedAt: {
+                          allocation: {
                             type: 'number',
-                            example: 1709529600000
+                            example: 1000
                           }
                         }
                       }
@@ -39,6 +60,15 @@ export const swaggerConfig: OpenAPIV3.Document = {
                     total: {
                       type: 'number',
                       example: 42
+                    },
+                    hasMore: {
+                      type: 'boolean',
+                      description: 'Indicates if there are more entries available'
+                    },
+                    nextCursor: {
+                      type: 'string',
+                      nullable: true,
+                      description: 'Cursor for the next set of entries'
                     }
                   }
                 }
@@ -61,39 +91,41 @@ export const swaggerConfig: OpenAPIV3.Document = {
                     type: 'string',
                     pattern: '^0x[a-fA-F0-9]{40}$',
                     example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
+                  },
+                  allocation: {
+                    type: 'number',
+                    example: 1000
                   }
                 },
-                required: ['walletAddress']
+                required: ['walletAddress', 'allocation']
               }
             }
-          }
-        },
-        responses: {
-          '201': {
-            description: 'Wallet added successfully',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    walletAddress: {
-                      type: 'string',
-                      example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
-                    },
-                    joinedAt: {
-                      type: 'number',
-                      example: 1709529600000
+          },
+          responses: {
+            '201': {
+              description: 'Wallet added successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      walletAddress: {
+                        type: 'string'
+                      },
+                      allocation: {
+                        type: 'number'
+                      }
                     }
                   }
                 }
               }
+            },
+            '400': {
+              description: 'Invalid wallet address format'
+            },
+            '409': {
+              description: 'Wallet already registered'
             }
-          },
-          '400': {
-            description: 'Invalid wallet address format'
-          },
-          '409': {
-            description: 'Wallet already registered'
           }
         }
       }
@@ -117,47 +149,53 @@ export const swaggerConfig: OpenAPIV3.Document = {
                 }
               }
             }
-          }
-        },
-        responses: {
-          '201': {
-            description: 'Bulk addition results',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    successful: {
-                      type: 'array',
-                      items: {
+          },
+          responses: {
+            '201': {
+              description: 'Bulk addition results',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      successful: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            walletAddress: { type: 'string' },
+                            allocation: { type: 'number' }
+                          }
+                        }
+                      },
+                      failed: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            walletAddress: { type: 'string' },
+                            reason: { type: 'string' }
+                          }
+                        }
+                      },
+                      summary: {
                         type: 'object',
                         properties: {
-                          walletAddress: { type: 'string' },
-                          joinedAt: { type: 'number' }
+                          total: { type: 'number' },
+                          succeeded: { type: 'number' },
+                          failed: { type: 'number' }
                         }
-                      }
-                    },
-                    failed: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          walletAddress: { type: 'string' },
-                          reason: { type: 'string' }
-                        }
-                      }
-                    },
-                    summary: {
-                      type: 'object',
-                      properties: {
-                        total: { type: 'number' },
-                        succeeded: { type: 'number' },
-                        failed: { type: 'number' }
                       }
                     }
                   }
                 }
               }
+            },
+            '400': {
+              description: 'No file provided'
+            },
+            '500': {
+              description: 'Failed to process bulk addition'
             }
           }
         }
@@ -172,7 +210,7 @@ export const swaggerConfig: OpenAPIV3.Document = {
             name: 'walletAddress',
             in: 'path',
             required: true,
-            description: 'Ethereum wallet address to check',
+            description: 'Wallet address to check',
             schema: {
               type: 'string',
               pattern: '^0x[a-fA-F0-9]{40}$',
@@ -188,38 +226,21 @@ export const swaggerConfig: OpenAPIV3.Document = {
                 schema: {
                   type: 'object',
                   properties: {
-                    exists: {
-                      type: 'boolean',
-                      description: 'Whether the wallet is in the waitlist'
-                    },
-                    details: {
-                      type: 'object',
-                      properties: {
-                        walletAddress: {
-                          type: 'string',
-                          example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
-                        },
-                        joinedAt: {
-                          type: 'number',
-                          example: 1709529600000
-                        }
-                      }
+                    allocation: {
+                      type: 'number',
+                      description: 'Allocation amount if exists'
                     }
                   }
                 },
                 examples: {
                   'Found': {
                     value: {
-                      exists: true,
-                      details: {
-                        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-                        joinedAt: 1709529600000
-                      }
+                      allocation: 1000
                     }
                   },
                   'Not Found': {
                     value: {
-                      exists: false
+                      allocation: 0
                     }
                   }
                 }

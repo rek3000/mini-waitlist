@@ -4,8 +4,8 @@ import { AddWalletRequest, BulkAddResponse } from '../types/index';
 export async function addToWaitlist(c: Context) {
   try {
     const body = await c.req.json<AddWalletRequest>();
-    // Convert to lowercase before validation
     const walletAddress = body.walletAddress?.toLowerCase();
+    const allocation = body.allocation; // Get allocation from request body
 
     // Basic wallet address validation
     if (!walletAddress?.match(/^0x[a-f0-9]{40}$/)) {
@@ -13,20 +13,19 @@ export async function addToWaitlist(c: Context) {
     }
 
     const kv = c.env.WAITLIST_KV;
-    
+
     // Check if wallet already exists
     const existing = await kv.get(walletAddress);
     if (existing) {
       return c.json({ error: 'Wallet already registered' }, 409);
     }
 
-    // Add wallet with timestamp
-    const timestamp = Date.now();
-    await kv.put(walletAddress, timestamp.toString());
+    // Add wallet with allocation
+    await kv.put(walletAddress, allocation.toString());
 
     return c.json({ 
       walletAddress,
-      joinedAt: timestamp
+      allocation
     }, 201);
   } catch (error) {
     return c.json({ error: 'Failed to add to waitlist' }, 500);
@@ -36,21 +35,29 @@ export async function addToWaitlist(c: Context) {
 export async function getWaitlist(c: Context) {
   try {
     const kv = c.env.WAITLIST_KV;
-    const { keys, list_complete } = await kv.list({});
+    const limit = parseInt(c.req.query('limit')) || 1000; // Default limit to 1000
+    const cursor = c.req.query('cursor') || undefined; // Get cursor from query
+
+    const { keys, list_complete } = await kv.list({
+      limit,
+      cursor,
+    });
 
     const entries = await Promise.all(
       keys.map(async (key) => {
-        const timestamp = await kv.get(key.name);
+        const allocation = await kv.get(key.name);
         return {
           walletAddress: key.name,
-          joinedAt: Number(timestamp)
+          allocation: Number(allocation) || 0 // Return allocation or 0 if not found
         };
       })
     );
 
     return c.json({
-      entries: entries.sort((a, b) => a.joinedAt - b.joinedAt),
-      total: entries.length
+      entries: entries.sort((a, b) => a.walletAddress.localeCompare(b.walletAddress)), // Sort by wallet address
+      total: entries.length,
+      hasMore: !list_complete, // Indicate if there are more entries
+      nextCursor: list_complete ? null : cursor // Provide the next cursor if there are more entries
     });
   } catch (error) {
     return c.json({ error: 'Failed to fetch waitlist' }, 500);
@@ -67,64 +74,65 @@ export async function bulkAddToWaitlist(c: Context) {
     }
 
     const content = await file.text();
-    const addresses = content
-      .split(/[\n,]/)
-      .map(addr => addr.trim().toLowerCase())
-      .filter(addr => addr.length > 0);
+    const lines = content.split(/[\n]/).map(line => line.trim()).filter(line => line.length > 0);
 
     const kv = c.env.WAITLIST_KV;
     const response: BulkAddResponse = {
       successful: [],
       failed: [],
       summary: {
-        total: addresses.length,
+        total: lines.length,
         succeeded: 0,
         failed: 0
       }
     };
 
-    await Promise.all(
-      addresses.map(async (walletAddress) => {
-        try {
-          if (!walletAddress.match(/^0x[a-f0-9]{40}$/)) {
-            response.failed.push({
-              walletAddress,
-              reason: 'Invalid wallet address format'
-            });
-            response.summary.failed++;
-            return;
-          }
+    // Split the lines into smaller batches
+    const BATCH_SIZE = Math.ceil(lines.length / 5); // Split into 5 smaller requests
 
-          const existing = await kv.get(walletAddress);
-          if (existing) {
-            response.failed.push({
-              walletAddress,
-              reason: 'Already registered'
-            });
-            response.summary.failed++;
-            return;
-          }
+    for (let i = 0; i < lines.length; i += BATCH_SIZE) {
+      const batch = lines.slice(i, i + BATCH_SIZE);
+      for (const line of batch) {
+        const [walletAddress, allocationStr] = line.split(',');
 
-          const timestamp = Date.now();
-          await kv.put(walletAddress, timestamp.toString());
-          
-          response.successful.push({
-            walletAddress,
-            joinedAt: timestamp
-          });
-          response.summary.succeeded++;
-        } catch (error) {
+        const cleanedWalletAddress = walletAddress.trim().toLowerCase();
+        const cleanedAllocationStr = allocationStr.trim();
+        const allocation = parseFloat(cleanedAllocationStr);
+
+        if (!cleanedWalletAddress.match(/^0x[a-f0-9]{40}$/) || isNaN(allocation)) {
           response.failed.push({
-            walletAddress,
-            reason: 'Internal error'
+            walletAddress: cleanedWalletAddress,
+            reason: 'Invalid wallet address or allocation format'
           });
           response.summary.failed++;
+          continue; // Skip to the next line
         }
-      })
-    );
+
+        const existing = await kv.get(cleanedWalletAddress);
+        if (existing) {
+          response.failed.push({
+            walletAddress: cleanedWalletAddress,
+            reason: 'Already registered'
+          });
+          response.summary.failed++;
+          continue; // Skip to the next line
+        }
+
+        await kv.put(cleanedWalletAddress, allocation.toString());
+        response.successful.push({
+          walletAddress: cleanedWalletAddress,
+          allocation
+        });
+        response.summary.succeeded++;
+      }
+
+      // Add a delay between batches to avoid hitting rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+    }
 
     return c.json(response, 201);
   } catch (error) {
+    console.error('Error processing bulk addition:', error);
     return c.json({ error: 'Failed to process bulk addition' }, 500);
   }
 }
@@ -138,18 +146,14 @@ export async function checkWallet(c: Context) {
     }
 
     const kv = c.env.WAITLIST_KV;
-    const timestamp = await kv.get(walletAddress);
+    const allocation = await kv.get(walletAddress);
     
-    if (!timestamp) {
-      return c.json({ exists: false });
+    if (!allocation) {
+      return c.json({ allocation: 0 });
     }
 
     return c.json({
-      exists: true,
-      details: {
-        walletAddress,
-        joinedAt: Number(timestamp)
-      }
+      allocation: Number(allocation) // Return allocation directly
     });
   } catch (error) {
     return c.json({ error: 'Failed to check wallet' }, 500);

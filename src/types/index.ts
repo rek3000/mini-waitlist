@@ -35,7 +35,10 @@ export interface CreateWaitlistEntryRequest {
 /**
  * Request body for adding a wallet to waitlist
  */
-export type AddWalletRequest = CreateWaitlistEntryRequest;
+export interface AddWalletRequest {
+  walletAddress: string;
+  allocation: number;
+}
 
 /**
  * Response structure for waitlist queries
@@ -43,7 +46,7 @@ export type AddWalletRequest = CreateWaitlistEntryRequest;
 export interface WaitlistResponse {
   entries: Array<{
     walletAddress: string;
-    joinedAt: number;
+    allocation: number;
   }>;
   total: number;
 }
@@ -54,7 +57,7 @@ export interface WaitlistResponse {
 export interface BulkAddResponse {
   successful: Array<{
     walletAddress: string;
-    joinedAt: number;
+    allocation: number;
   }>;
   failed: Array<{
     walletAddress: string;
@@ -67,11 +70,10 @@ export interface BulkAddResponse {
   };
 }
 
-// Add new interface for wallet check response
+/**
+ * Response for wallet check
+ */
 export interface WalletCheckResponse {
   exists: boolean;
-  details?: {
-    walletAddress: string;
-    joinedAt: number;
-  };
+  allocation?: number;
 } 
